@@ -17,3 +17,11 @@ stock CP1251_FromUTF(const utf_stream[], const utf_stream_size, output[], const 
 		is_packed
 	);
 }
+//	Convert CP1251-stream to UTF-stream.
+stock CP1251_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
+	PawnUTF_StreamToUTF(array, array_size, output[], output_size, is_packed);
+}
+//	Convert CP1251-string to UTF-stream.
+stock CP1251_StringToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
+	PawnUTF_StringToUTF(string, array_size, output, output_size, is_packed, cp1251_to_utf);
+}

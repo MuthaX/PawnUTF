@@ -1,3 +1,22 @@
+//	Convert codepage-string to UTF-stream.
+stock PawnUTF_StringToUTF(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[256]) {
+	new
+		cp_character,
+		i,
+		max_i = (string_size > output_size) ? output_size : string_size
+	;
+	for(i = 0; i < max_i; ++i) {
+		new
+			cp_character
+		;
+		if( is_packed ) {
+			cp_character = string{i};
+		} else {
+			cp_character = string[i];
+		}
+		output[i] = collation_table[cp_character];
+	}
+}
 //	Extract UTF characters from string-stream.
 stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
 	new
