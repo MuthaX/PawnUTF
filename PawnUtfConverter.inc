@@ -1,20 +1,20 @@
-//	Convert codepage-string to UTF-stream.
-stock PawnUTF_StringToUTF(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[256]) {
+//	Convert codepage-string to stream defined via collation table.
+stock PawnUTF_StringToCollation(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[], const collation_size) {
 	new
 		cp_character,
 		i,
 		max_i = (string_size > output_size) ? output_size : string_size
 	;
 	for(i = 0; i < max_i; ++i) {
-		new
-			cp_character
-		;
+
 		if( is_packed ) {
 			cp_character = string{i};
 		} else {
 			cp_character = string[i];
 		}
-		output[i] = collation_table[cp_character];
+		if( cp_character < collation_size ) {
+			output[i] = collation_table[cp_character];
+		}
 	}
 }
 //	Extract UTF characters from string-stream.
@@ -175,6 +175,87 @@ stock PawnUTF_StreamUnicode_ToUTF(
 	}
 	output[max_i - 1] = EOS;
 }
+//	Writes current CP-UTF collation (which used in fwrite).
+stock PawnUTF_WriteCurrentCP(const filepath_input[], const filepath_output[]) {
+	new
+		File:f_input = fopen(filepath_input, io_write),
+		File:f_output = fopen(filepath_output, io_write),
+		string[32],
+		start_from = 32,
+		cval,
+		counter = start_from
+	;
+
+	for(new i = start_from; i < 256; ++i) {
+		if( i == '\n' ) {
+			continue;
+		}
+		string[0] = i;
+		string[1] = 0;
+		fwrite(f_input, string);
+		fwrite(f_input, "\n");
+	}
+	fclose(f_input);
+
+	if(start_from > 0 && start_from != '\n') {
+		format(string, sizeof(string), "%x\t", counter);
+		fwrite(f_output, string);
+	}
+
+	fopen(filepath_input, io_read);
+	while( (cval = fgetchar(f_input, 0, false)) != EOF ) {
+		if( cval == '\n') {
+			counter++;
+			if( counter == '\n' ) {
+				counter++;
+			}
+			if( counter < 256 ) {
+				format(string, sizeof(string), "\n%x\t", counter);
+				fwrite(f_output, string);
+			}
+		} else {
+			format(string, sizeof(string), "%x", cval);
+			fwrite(f_output, string);
+		}
+	}
+	fclose(f_input);
+	fclose(f_output);
+}
+
+//	Reads one UTF-symbol from opened file.
+stock PawnUTF_GetFileCharUTF(const File:handle) {
+	new
+		single_char,
+		i,
+		max_byte,
+		result = 0
+	;
+	result = single_char = fgetchar(handle, 0, false);
+	if( single_char != EOF ) {
+		if( single_char & (1 << 7) ) {
+			for(i = 5; i > 0; --i) {
+				if( !((single_char >> i) & 1) ) {
+					max_byte = 7 - 1 - i;
+					break;
+				}
+			}
+		} else {
+			max_byte = 0;
+		}
+		result = single_char;
+		for(i = max_byte; i > 0; --i) {
+			single_char = fgetchar(handle, 0, false);
+			if( single_char != EOF ) {
+				result = (result << 8) | single_char;
+			} else {
+				break;
+			}
+		}
+	} else {
+		result = EOF;
+	}
+	return result;
+}
 //==============================================================================
 static stock UTF_FindExtraChar(const array[][2], const array_size, const utf_code) {
 	for(new i = 0; i < array_size; ++i) {
@@ -193,11 +274,11 @@ static stock UTF_AddExtraChar(array[][2], const array_size, const utf_code, cons
 }
 //==============================================================================
 //	Load codepage collation table.
-stock UTF_LoadChatsetMapping(const filepath[], table_to_utf[256], table_from_utf[0x10000 char], table_from_utf_extra[][2], const extra_size) {
+stock UTF_LoadChatsetMapping(const filepath[], table_to_utf[256], table_from_utf[0x10000 char], table_from_utf_extra[][2], const extra_size, table_unicode[0x10000 char], table_to_unicode[256]) {
 	new
 		File:f = fopen(filepath, io_read),
 		string[64],
-		utf_code, codepage_code
+		utf_code, codepage_code, unicode_code
 	;
 	if( f ) {
 		while( fread(f, string) ) {
@@ -210,7 +291,10 @@ stock UTF_LoadChatsetMapping(const filepath[], table_to_utf[256], table_from_utf
 					} else {
 						UTF_AddExtraChar(table_from_utf_extra, extra_size, utf_code, codepage_code);
 					}
+					unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_code);
 					table_to_utf[codepage_code] = utf_code;
+					table_unicode{unicode_code} = codepage_code;
+					table_to_unicode[codepage_code] = unicode_code;
 				} else {
 					printf("Local or UTF code is out of range in %s @ %s", filepath, string);
 				}
