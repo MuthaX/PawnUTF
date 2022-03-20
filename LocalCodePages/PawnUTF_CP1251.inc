@@ -45,18 +45,18 @@ stock CP1251_FileFixUTF(const filepath_source[], const filepath_dest[]) {
 		print("[CP1251_FileFixUTF] Impossible to write to the same file!");
 		return;
 	}
+	CP1251_FileFixUTF_Handles(f_input, f_output);
+	fclose(f_input);
+	fclose(f_output);
+}
+
+stock CP1251_FileFixUTF_Handles(const File:f_input, const File:f_output) {
 	new
-		File:f_input =	fopen(filepath_source, io_read),
-		File:f_output =	fopen(filepath_dest, io_write),
 		truechar_as_unicode,
 		true_unicode
 	;
-	//while( (utf_source_symbol = PawnUTF_GetFileCharUTF(f_input)) != EOF ) {
-		//truechar_as_unicode = PawnUTF_DecodeUTF_ToUnicode(utf_source_symbol);
 	while( (truechar_as_unicode = fgetchar(f_input, 0, true)) != EOF ) {
 		true_unicode = CP1251_CharToUnicode(truechar_as_unicode);
 		fputchar(f_output, true_unicode, true);
 	}
-	fclose(f_input);
-	fclose(f_output);
 }
