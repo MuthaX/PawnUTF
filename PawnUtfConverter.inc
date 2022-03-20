@@ -1,4 +1,4 @@
-//	Convert codepage-string to stream defined via collation table.
+//	Convert codepage-string to other representation via collation table.
 stock PawnUTF_StringToCollation(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[], const collation_size) {
 	new
 		cp_character,
@@ -17,7 +17,7 @@ stock PawnUTF_StringToCollation(const string[], const string_size, output[], con
 		}
 	}
 }
-//	Extract UTF characters from string-stream.
+//	Extract UTF-string characters from string-stream.
 stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
 	new
 		max_bytes = ((1 + is_packed * 3) * array_size),
@@ -109,9 +109,9 @@ stock PawnUTF_EncodeUnicode_ToUTF(const unicode_code) {
 	result |= ( i << (8 * n) );
 	return result;
 }
-//	Converts UTF-stream to stream with codepage defined in collation tables.
-stock PawnUTF_StreamUTF_ToCodePage(
-	const utf_stream[], const utf_stream_size,
+//	Converts UTF-string to codepage-string via collation tables.
+stock PawnUTF_StringUTF_ToCodePage(
+	const utf_string[], const utf_string_size,
 	output[], const output_size,
 	const table_from_utf[0x10000 char], const table_from_utf_extra[][2], const extra_size, const is_packed
 ) {
@@ -120,12 +120,12 @@ stock PawnUTF_StreamUTF_ToCodePage(
 		byte_value,
 		utf_code, codepage_code, extra_slot
 	;
-	for(i = 0, j = 0; i < utf_stream_size; ++i) {
+	for(i = 0, j = 0; i < utf_string_size; ++i) {
 		if( j >= output_size ) {
 			output[output_size - 1] = 0;
 			break;
 		}
-		utf_code = utf_stream[i];
+		utf_code = utf_string[i];
 		if( !utf_code ) {
 			output[j] = 0;
 			break;
@@ -153,25 +153,25 @@ stock PawnUTF_StreamUTF_ToCodePage(
 		}
 	}
 }
-//	Convert UTF-stream to Unicode-stream.
-stock PawnUTF_StreamUTF_ToUnicode(
-	const utf_stream[], const utf_stream_size,
+//	Convert UTF-string to Unicode-string.
+stock PawnUTF_StringUTF_ToUnicode(
+	const utf_string[], const utf_string_size,
 	output[], const output_size
 ) {
-	new max_i = (utf_stream_size > output_size) ? output_size : utf_stream_size;
+	new max_i = (utf_string_size > output_size) ? output_size : utf_string_size;
 	for(new i = 0; i < max_i; ++i) {
-		output[i] = PawnUTF_DecodeUTF_ToUnicode(utf_stream[i]);
+		output[i] = PawnUTF_DecodeUTF_ToUnicode(utf_string[i]);
 	}
 	output[max_i - 1] = EOS;
 }
-//	Convert Unicode-stream to UTF-stream.
-stock PawnUTF_StreamUnicode_ToUTF(
-	const unicode_stream[], const unicode_stream_size,
+//	Convert Unicode-string to UTF-string.
+stock PawnUTF_StringUnicode_ToUTF(
+	const unicode_string[], const unicode_string_size,
 	output[], const output_size
 ) {
-	new max_i = (unicode_stream_size > output_size) ? output_size : unicode_stream_size;
+	new max_i = (unicode_string_size > output_size) ? output_size : unicode_string_size;
 	for(new i = 0; i < max_i; ++i) {
-		output[i] = PawnUTF_EncodeUnicode_ToUTF(unicode_stream[i]);
+		output[i] = PawnUTF_EncodeUnicode_ToUTF(unicode_string[i]);
 	}
 	output[max_i - 1] = EOS;
 }
@@ -222,7 +222,7 @@ stock PawnUTF_WriteCurrentCP(const filepath_input[], const filepath_output[]) {
 	fclose(f_output);
 }
 
-//	Reads one UTF-symbol from opened file.
+//	Reads one UTF-symbol from opened file without decoding.
 stock PawnUTF_GetFileCharUTF(const File:handle) {
 	new
 		single_char,

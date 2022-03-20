@@ -9,21 +9,21 @@ stock CP1251_Init(const filepath[]) {
 	UTF_LoadChatsetMapping(filepath, cp1251_to_utf, cp1251_from_utf, cp1251_from_utf_extra, sizeof(cp1251_from_utf_extra), cp1251_from_unicode, cp1251_to_unicode);
 }
 
-// Convert UTF-stream to CP1251.
-stock CP1251_FromUTF(const utf_stream[], const utf_stream_size, output[], const output_size, const is_packed) {
-	PawnUTF_StreamUTF_ToCodePage(
-		utf_stream, utf_stream_size,
+//	Convert UTF-string to CP1251-string.
+stock CP1251_FromUTF(const utf_string[], const utf_string_size, output[], const output_size, const is_packed) {
+	PawnUTF_StringUTF_ToCodePage(
+		utf_string, utf_string_size,
 		output, output_size,
 		cp1251_from_utf,
 		cp1251_from_utf_extra, sizeof(cp1251_from_utf_extra),
 		is_packed
 	);
 }
-//	Convert CP1251-stream to UTF-stream.
-stock CP1251_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
-	PawnUTF_StreamToUTF(array, array_size, output, output_size, is_packed);
+//	Convert Unicode-string to CP1251-string.
+stock CP1251_FromUnicode(const unicode_string[], const unicode_string_size, output[], const output_size) {
+	PawnUTF_StringToCollation(unicode_string, unicode_string_size, output, output_size, false, cp1251_from_unicode, sizeof(cp1251_from_unicode));
 }
-//	Convert CP1251-string to UTF-stream.
+//	Convert CP1251-string to UTF-string.
 stock CP1251_StringToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
 	PawnUTF_StringToCollation(array, array_size, output, output_size, is_packed, cp1251_to_utf, sizeof(cp1251_to_utf));
 }
@@ -48,12 +48,12 @@ stock CP1251_FileFixUTF(const filepath_source[], const filepath_dest[]) {
 	new
 		File:f_input =	fopen(filepath_source, io_read),
 		File:f_output =	fopen(filepath_dest, io_write),
-		utf_source_symbol,
 		truechar_as_unicode,
 		true_unicode
 	;
-	while( (utf_source_symbol = PawnUTF_GetFileCharUTF(f_input)) != EOF ) {
-		truechar_as_unicode = PawnUTF_DecodeUTF_ToUnicode(utf_source_symbol);
+	//while( (utf_source_symbol = PawnUTF_GetFileCharUTF(f_input)) != EOF ) {
+		//truechar_as_unicode = PawnUTF_DecodeUTF_ToUnicode(utf_source_symbol);
+	while( (truechar_as_unicode = fgetchar(f_input, 0, true)) != EOF ) {
 		true_unicode = CP1251_CharToUnicode(truechar_as_unicode);
 		fputchar(f_output, true_unicode, true);
 	}
