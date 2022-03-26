@@ -1,3 +1,55 @@
+enum e_utf_bom_mark_type {
+	E_MARK_UNDEFINED,	// No BOM or unknown sequence detected.
+	E_MARK_UTF8,		// UTF-8
+	E_MARK_UTF16BE,		// UTF-16 Big Endian
+	E_MARK_UTF16LE,		// UTF-16 Little Endian
+	E_MARK_UTF32BE,		// UTF-32 Big Endian
+	E_MARK_UTF32LE		// UTF-32 Little Endian
+};
+//	Returns True if Unicode-symbol is BOM.
+stock PawnUTF_IsUnicodeBOM(const unicode_code) {
+	return (unicode_code == 0xFEFF);
+}
+//	Returns True if UTF BOM type is big-endian.
+stock PawnUTF_IsTypeBOM_BigEndian(const e_utf_bom_mark_type:bom_type) {
+	return (bom_type == e_utf_bom_mark_type:E_MARK_UTF16BE || bom_type == e_utf_bom_mark_type:E_MARK_UTF32BE);
+}
+//	Returns True if UTF BOM type is little-endian.
+stock PawnUTF_IsTypeBOM_LittleEndian(const e_utf_bom_mark_type:bom_type) {
+	return (bom_type == e_utf_bom_mark_type:E_MARK_UTF16LE || bom_type == e_utf_bom_mark_type:E_MARK_UTF32LE);
+}
+//	Trying to read UTF BOM-symbol from start of the file.
+//	Places file pointer right after BOM-symbol or to the start of file if no known BOM-sequence found.
+//	Returns BOM-mark type.
+stock e_utf_bom_mark_type:PawnUTF_TryGetBOM(const File:handle) {
+	fseek(handle, 0, seek_start);
+	new
+		byte_0 = fgetchar(handle, 0, false),
+		byte_1 = fgetchar(handle, 0, false),
+		byte_2 = fgetchar(handle, 0, false),
+		byte_3 = fgetchar(handle, 0, false)
+	;
+	if( byte_0 == 0xEF ) {
+		if( byte_1 == 0xBB && byte_2 == 0xBF ) {
+			fseek(handle, 3, seek_start);
+			return e_utf_bom_mark_type:E_MARK_UTF8;
+		}
+	} else if( byte_0 == 0xFE && byte_1 == 0xFF ) {
+		fseek(handle, 2, seek_start);
+		return e_utf_bom_mark_type:E_MARK_UTF16LE;
+	} else if( byte_0 == 0xFF && byte_1 == 0xFE ) {
+		if( !byte_2 && !byte_3 ) {
+			return e_utf_bom_mark_type:E_MARK_UTF32BE;
+		} else {
+			fseek(handle, 2, seek_start);
+			return e_utf_bom_mark_type:E_MARK_UTF16BE;
+		}
+	} else if( !byte_0 && !byte_1 && byte_2 == 0xFE && byte_3 == 0xFF) {
+		return e_utf_bom_mark_type:E_MARK_UTF32LE;
+	}
+	fseek(handle, 0, seek_start);
+	return e_utf_bom_mark_type:E_MARK_UNDEFINED;
+}
 //	Convert codepage-string to other representation via collation table.
 stock PawnUTF_StringToCollation(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[], const collation_size) {
 	new
@@ -71,9 +123,8 @@ stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const outpu
 //==============================================================================
 //	Decode UTF-character to Unicode symbol.
 stock PawnUTF_DecodeUTF_ToUnicode(const utf_code) {
-	new result = 0, i, byte_value;
+	new result = 0, i = 0, byte_value;
 	if( utf_code & 0x80 ) {
-		i = 0;
 		byte_value = utf_code & 0xFF;
 		while( byte_value & 0x80 ) {
 			if( byte_value & 0x40 ) {	// is end
@@ -302,4 +353,234 @@ stock UTF_LoadChatsetMapping(const filepath[], table_to_utf[256], table_from_utf
 		}
 		fclose(f);
 	}
+}
+//==============================================================================
+//	Section UTF-16.
+//	Writes UTF-16 BOM-symbol into the file.
+stock PawnUTF_FWriteUTF16BOM(const File:handle, const is_bigendian) {
+	if( is_bigendian ) {
+		fputchar(handle, 0xFE, false);
+		fputchar(handle, 0xFF, false);
+	} else {
+		fputchar(handle, 0xFF, false);
+		fputchar(handle, 0xFE, false);
+	}
+}
+//	Reads single UTF-16(big endian) symbol from file.
+//	Returns Unicode-symbol.
+stock PawnUTF_GetFileCharUTF16_BE(const File:handle) {
+	new
+		word_a,
+		word_b,
+		result = EOF
+	;
+	word_a = fgetchar(handle, 0, false);
+	word_b = fgetchar(handle, 0, false);
+	if( word_a != EOF && word_a != EOF ) {
+		result = word_b | (word_a << 8);
+		if( result < 0xD800 || result > 0xDFFF ) {
+			return result;
+		} else if( result < 0xDC00 ) {
+			word_a = fgetchar(handle, 0, false);
+			word_b = fgetchar(handle, 0, false);
+			if( word_a == EOF && word_b == EOF ) {
+				return EOF;
+			}
+			word_b = word_b | (word_a << 8);
+			if( (word_b < 0xDC00) || (word_b > 0xDFFF) ) {
+				return 0x0000;
+			} else {
+				result = (result << 10) | (word_b & 0x03FFF);
+				result += 0x10000;
+			}
+		} else {
+			return 0x0000;
+		}
+	}
+	return result;
+}
+//	Reads single UTF-16(little endian) symbol from file.
+//	Returns Unicode-symbol.
+stock PawnUTF_GetFileCharUTF16_LE(const File:handle) {
+	new
+		word_a,
+		word_b,
+		result = EOF
+	;
+	word_a = fgetchar(handle, 0, false);
+	word_b = fgetchar(handle, 0, false);
+	if( word_a != EOF && word_a != EOF ) {
+		result = (word_b << 8) | word_a;
+		if( result < 0xD800 || result > 0xDFFF ) {
+			return result;
+		} else if( result < 0xDC00 ) {
+			word_a = fgetchar(handle, 0, false);
+			word_b = fgetchar(handle, 0, false);
+			if( word_a == EOF && word_b == EOF ) {
+				return EOF;
+			}
+			word_b = (word_b << 8) | word_a;
+			if( (word_b < 0xDC00) || (word_b > 0xDFFF) ) {
+				return 0x0000;
+			} else {
+				result = (result << 10) | (word_b & 0x03FFF);
+				result += 0x10000;
+			}
+		} else {
+			return 0x0000;
+		}
+	}
+	return result;
+}
+//	Return encoded Unicode-symbol to UTF-16.
+stock PawnUTF_EncodeUnicode_ToUTF16(const unicode_code) {
+	if( unicode_code < 0x10000 ) {
+		return unicode_code;
+	}
+	new
+		pre_code =	unicode_code - 0x10000,
+		word_a =	0xD800 | (pre_code & 0x03FF),
+		word_b =	0xDC00 | ((pre_code >> 10) & 0x03FFF)
+	;
+	return ((word_b << 16) | word_a);
+}
+//	Writes single Unicode-symbol encoded to big-endian UTF-16 into the file.
+stock PawnUTF_PutFileCharUTF16_BE(const File:handle, const unicode_code) {
+	new utf_code = PawnUTF_EncodeUnicode_ToUTF16(unicode_code);
+	if( utf_code & 0xFFFF0000 ) {
+		fputchar(handle, (utf_code >> 24) & 0xFF, false);
+		fputchar(handle, (utf_code >> 16) & 0xFF, false);
+	}
+	fputchar(handle, (utf_code >> 8) & 0xFF, false);
+	fputchar(handle, (utf_code) & 0xFF, false);
+}
+//	Writes single Unicode-symbol encoded to big-endian UTF-16 into the file.
+stock PawnUTF_PutFileCharUTF16_LE(const File:handle, const unicode_code) {
+	new utf_code = PawnUTF_EncodeUnicode_ToUTF16(unicode_code);
+	if( utf_code & 0xFFFF0000 ) {
+		fputchar(handle, (utf_code >> 16) & 0xFF, false);
+		fputchar(handle, (utf_code >> 24) & 0xFF, false);
+	}
+	fputchar(handle, (utf_code) & 0xFF, false);
+	fputchar(handle, (utf_code >> 8) & 0xFF, false);
+}
+//	Reads Unicode-string decoded from UTF-16 file.
+//	Returns number of readen symbols.
+stock PawnUTF_FRead_UTF16(const File:handle, unicode_string[], const size, const is_bigendian) {
+	new idx = 0, unicode_code;
+	if( is_bigendian ) {
+		while( (idx < size) && (unicode_code = PawnUTF_GetFileCharUTF16_BE(handle)) != EOF ) {
+			unicode_string[idx++] = unicode_code;
+			if( unicode_code == '\n' ) {
+				break;
+			}
+		}
+	} else {
+		while( (idx < size) && (unicode_code = PawnUTF_GetFileCharUTF16_BE(handle)) != EOF ) {
+			unicode_string[idx++] = unicode_code;
+			if( unicode_code == '\n' ) {
+				break;
+			}
+		}
+	}
+	unicode_string[((idx < size) ? idx : (size -1))] = EOS;	// NULL-termine symbol at the end.
+	return idx;
+}
+//	Writes Unicode string which encoded to UTF-16 into the file.
+//	Returns number of writen symbols.
+stock PawnUTF_FWrite_UTF16(const File:handle, const string[], const is_bigendian) {
+	new idx = 0;
+	if( is_bigendian ) {
+		while(string[idx]) {
+			PawnUTF_PutFileCharUTF16_BE(handle, string[idx++]);
+		}
+	} else {
+		while(string[idx]) {
+			PawnUTF_PutFileCharUTF16_LE(handle, string[idx++]);
+		}
+	}
+	return idx;
+}
+//==============================================================================
+//	Section UTF-32.
+//	Writes UTF-32 BOM-symbol into the file.
+stock PawnUTF_FWriteUTF32BOM(const File:handle, const is_bigendian) {
+	if( is_bigendian ) {
+		fputchar(handle, 0x00, false);
+		fputchar(handle, 0x00, false);
+		fputchar(handle, 0xFE, false);
+		fputchar(handle, 0xFF, false);
+	} else {
+		fputchar(handle, 0xFF, false);
+		fputchar(handle, 0xFE, false);
+		fputchar(handle, 0x00, false);
+		fputchar(handle, 0x00, false);
+	}
+}
+//	Reads single UTF-32(big endian) symbol from file.
+//	Returns Unicode-symbol.
+stock PawnUTF_GetFileCharUTF32_BE(const File:handle) {
+	new single_char = (fgetchar(handle, 0, false) << 24);
+	single_char |= (fgetchar(handle, 0, false) << 16);
+	single_char |= (fgetchar(handle, 0, false) << 8);
+	single_char |= (fgetchar(handle, 0, false));
+}
+//	Reads single UTF-32(little endian) symbol from file.
+//	Returns Unicode-symbol.
+stock PawnUTF_GetFileCharUTF32_LE(const File:handle) {
+	new single_char = fgetchar(handle, 0, false);
+	single_char |= (fgetchar(handle, 0, false) << 8);
+	single_char |= (fgetchar(handle, 0, false) << 16);
+	single_char |= (fgetchar(handle, 0, false) << 24);
+}
+//	Writes single Unicode-symbol encoded to big-endian UTF-32 into the file.
+stock PawnUTF_PutFileCharUTF32_BE(const File:handle, const unicode_code) {
+	fputchar(handle, (unicode_code >> 24) & 0xFF, false);
+	fputchar(handle, (unicode_code >> 16) & 0xFF, false);
+	fputchar(handle, (unicode_code >> 8) & 0xFF, false);
+	fputchar(handle, (unicode_code) & 0xFF, false);
+}
+//	Writes single Unicode-symbol encoded to little-endian UTF-32 into the file.
+stock PawnUTF_PutFileCharUTF32_LE(const File:handle, const unicode_code) {
+	fputchar(handle, (unicode_code) & 0xFF, false);
+	fputchar(handle, (unicode_code >> 8) & 0xFF, false);
+	fputchar(handle, (unicode_code >> 16) & 0xFF, false);
+	fputchar(handle, (unicode_code >> 24) & 0xFF, false);
+}
+//	Reads Unicode-string decoded from UTF-32 file.
+//	Returns number of readen symbols.
+stock PawnUTF_FRead_UTF32(const File:handle, unicode_string[], const size, const is_bigendian) {
+	new idx = 0, unicode_code;
+	if( is_bigendian ) {
+		while( (idx < size) && (unicode_code = PawnUTF_GetFileCharUTF32_BE(handle)) != EOF ) {
+			unicode_string[idx++] = unicode_code;
+			if( unicode_code == '\n' ) {
+				break;
+			}
+		}
+	} else {
+		while( (idx < size) && (unicode_code = PawnUTF_GetFileCharUTF32_LE(handle)) != EOF ) {
+			unicode_string[idx++] = unicode_code;
+			if( unicode_code == '\n' ) {
+				break;
+			}
+		}
+	}
+	unicode_string[((idx < size) ? idx : (size -1))] = EOS;	// NULL-termine symbol at the end.
+	return idx;
+}
+//	Writes Unicode string which encoded to UTF-32 into the file.
+//	Returns number of writen symbols.
+stock PawnUTF_FWrite_UTF32(const File:handle, const string[], const is_bigendian) {
+	new idx = 0;
+	if( is_bigendian ) {
+		while(string[idx]) {
+			PawnUTF_PutFileCharUTF32_BE(handle, string[idx++]);
+		}
+	} else {
+		while(string[idx]) {
+			PawnUTF_PutFileCharUTF32_LE(handle, string[idx++]);
+		}
+	}
+	return idx;
 }

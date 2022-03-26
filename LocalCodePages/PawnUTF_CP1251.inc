@@ -52,11 +52,29 @@ stock CP1251_FileFixUTF(const filepath_source[], const filepath_dest[]) {
 
 stock CP1251_FileFixUTF_Handles(const File:f_input, const File:f_output) {
 	new
+		e_utf_bom_mark_type:bom_type,
 		truechar_as_unicode,
-		true_unicode
+		true_unicode,
+		prev_char = 0,
+		count = 0
 	;
+	bom_type = PawnUTF_TryGetBOM(f_input);
+	if( bom_type != E_MARK_UNDEFINED ) {
+		printf("Found BOM-type: %d", _:bom_type);
+	}
 	while( (truechar_as_unicode = fgetchar(f_input, 0, true)) != EOF ) {
+		if( truechar_as_unicode > 0xFF ) {
+			if( count ) {
+				printf("Cant convert symbol: %x @ %d", truechar_as_unicode, count);
+				truechar_as_unicode = '?';
+			}
+		}
 		true_unicode = CP1251_CharToUnicode(truechar_as_unicode);
+		if( true_unicode == '\n' && prev_char != '\r' ) {
+			fputchar(f_output, '\r', true);
+		}
 		fputchar(f_output, true_unicode, true);
+		count++;
+		prev_char = true_unicode;
 	}
 }
