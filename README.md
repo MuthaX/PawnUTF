@@ -70,13 +70,9 @@ __PawnUTF_StringToCollation(string[], string_size, output[], output_size, is_pac
 > * File:handle
 >
 
-**UTF_LoadChatsetMapping(filepath[], table_to_utf[256], table_from_utf[0x10000 char], table_from_utf_extra[][2], extra_size, table_unicode[0x10000 char], table_to_unicode[256])**
+**UTF_LoadCharsetMapping(filepath[], table_unicode[0x10000 char], table_to_unicode[256])**
 > Load codepage collation table.
 > * filepath[] - path of file with collation table to load.
-> * table_to_utf[256] - destination collation table[CP-N code] = utf_code.
-> * table_from_utf[0x10000 char] - destination collation table[utf_code] = CP-N code.
-> * table_from_utf_extra[][2] - destination collation table[i][2] = {utf_code, CP-N code}.
-> * extra_size - size of table_From_utf_extra.
 > * table_unicode[0x10000 char] - destination collation table[unicode_symbol] = CP-N code.
 > * table_to_unicode[256] - destination collation table[CP-N] = unicode_symbol.
 >

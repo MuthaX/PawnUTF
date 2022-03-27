@@ -1,31 +1,22 @@
-static cp1251_to_utf[256];
-static cp1251_from_utf[0x10000 char];
-static cp1251_from_utf_extra[18][2];
 static cp1251_from_unicode[0x10000 char];
 static cp1251_to_unicode[256];
 
 //	Load collation table from file.
 stock CP1251_Init(const filepath[]) {
-	UTF_LoadChatsetMapping(filepath, cp1251_to_utf, cp1251_from_utf, cp1251_from_utf_extra, sizeof(cp1251_from_utf_extra), cp1251_from_unicode, cp1251_to_unicode);
+	UTF_LoadCharsetMapping(filepath, cp1251_from_unicode, cp1251_to_unicode);
 }
-
 //	Convert UTF-string to CP1251-string.
 stock CP1251_FromUTF(const utf_string[], const utf_string_size, output[], const output_size, const is_packed) {
-	PawnUTF_StringUTF_ToCodePage(
-		utf_string, utf_string_size,
-		output, output_size,
-		cp1251_from_utf,
-		cp1251_from_utf_extra, sizeof(cp1251_from_utf_extra),
-		is_packed
-	);
+	PawnUTF_StringUTF_ToCodePage(utf_string, utf_string_size, output, output_size, cp1251_from_unicode, is_packed);
 }
 //	Convert Unicode-string to CP1251-string.
 stock CP1251_FromUnicode(const unicode_string[], const unicode_string_size, output[], const output_size) {
-	PawnUTF_StringToCollation(unicode_string, unicode_string_size, output, output_size, false, cp1251_from_unicode, sizeof(cp1251_from_unicode));
+	PawnUTF_StringToCollationB(unicode_string, unicode_string_size, output, output_size, false, cp1251_from_unicode);
 }
 //	Convert CP1251-string to UTF-string.
 stock CP1251_StringToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
-	PawnUTF_StringToCollation(array, array_size, output, output_size, is_packed, cp1251_to_utf, sizeof(cp1251_to_utf));
+	CP1251_StringToUnicode(array, array_size, output, output_size, is_packed);
+	PawnUTF_StringUnicode_ToUTF(output, output_size, output, output_size);
 }
 //	Convert CP1251-string to Unicode-stream.
 stock CP1251_StringToUnicode(const array[], const array_size, output[], const output_size, const is_packed) {

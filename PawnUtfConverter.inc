@@ -69,6 +69,22 @@ stock PawnUTF_StringToCollation(const string[], const string_size, output[], con
 		}
 	}
 }
+//	Convert codepage-string to other representation via collation table with 1-byte cell.
+stock PawnUTF_StringToCollationB(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[]) {
+	new
+		cp_character,
+		i,
+		max_i = (string_size > output_size) ? output_size : string_size
+	;
+	for(i = 0; i < max_i; ++i) {
+		if( is_packed ) {
+			cp_character = string{i};
+		} else {
+			cp_character = string[i];
+		}
+		output[i] = collation_table{cp_character};
+	}
+}
 //	Extract UTF-string characters from string-stream.
 stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
 	new
@@ -164,12 +180,13 @@ stock PawnUTF_EncodeUnicode_ToUTF(const unicode_code) {
 stock PawnUTF_StringUTF_ToCodePage(
 	const utf_string[], const utf_string_size,
 	output[], const output_size,
-	const table_from_utf[0x10000 char], const table_from_utf_extra[][2], const extra_size, const is_packed
+	const table_from_unicode[0x10000 char], const is_packed
 ) {
 	new
-		i, j = 0, k,
+		i, j = 0,
 		byte_value,
-		utf_code, codepage_code, extra_slot
+		unicode_code,
+		utf_code
 	;
 	for(i = 0, j = 0; i < utf_string_size; ++i) {
 		if( j >= output_size ) {
@@ -177,30 +194,15 @@ stock PawnUTF_StringUTF_ToCodePage(
 			break;
 		}
 		utf_code = utf_string[i];
-		if( !utf_code ) {
-			output[j] = 0;
-			break;
-		}
-		if( utf_code > 0xFFFF ) {
-			extra_slot = UTF_FindExtraChar(table_from_utf_extra, extra_size, utf_code);
-			if( extra_slot == -1 ) {
-				codepage_code = 0;
+		unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_code);
+		if( unicode_code < 0x10000 ) {
+			byte_value = table_from_unicode{unicode_code};
+			if( is_packed ) {
+				output{j} = byte_value;
 			} else {
-				codepage_code = table_from_utf_extra[extra_slot][1];
+				output[j] = byte_value;
 			}
-		} else {
-			codepage_code = table_from_utf{utf_code};
-		}
-		for(k = 3; k > -1; --k) {
-			byte_value = (codepage_code >> (8 * k)) & 0xFF;
-			if( byte_value ) {
-				if( is_packed ) {
-					output{j} = byte_value;
-				} else {
-					output[j] = byte_value;
-				}
-				j++;
-			}
+			j++;
 		}
 	}
 }
@@ -325,32 +327,29 @@ static stock UTF_AddExtraChar(array[][2], const array_size, const utf_code, cons
 }
 //==============================================================================
 //	Load codepage collation table.
-stock UTF_LoadChatsetMapping(const filepath[], table_to_utf[256], table_from_utf[0x10000 char], table_from_utf_extra[][2], const extra_size, table_unicode[0x10000 char], table_to_unicode[256]) {
+stock UTF_LoadCharsetMapping(const filepath[], table_unicode[0x10000 char], table_to_unicode[256]) {
 	new
 		File:f = fopen(filepath, io_read),
 		string[64],
-		utf_code, codepage_code, unicode_code
+		codepage_code, unicode_code
 	;
 	if( f ) {
 		while( fread(f, string) ) {
-			if( sscanf(string, "p<\t>hh", codepage_code, utf_code) ) {
+			if( sscanf(string, "p<\t>hh", codepage_code, unicode_code) ) {
 				printf("Found invalid string in %s @ %s.", filepath, string);
 			} else {
 				if( !(codepage_code & 0xFFFFFF00) ) {
-					if( utf_code < 0x10000 ) {
-						table_from_utf{utf_code} = codepage_code;
-					} else {
-						UTF_AddExtraChar(table_from_utf_extra, extra_size, utf_code, codepage_code);
+					if( unicode_code ) {	// if it have collation.
+						table_unicode{unicode_code} = codepage_code;
+						table_to_unicode[codepage_code] = unicode_code;
 					}
-					unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_code);
-					table_to_utf[codepage_code] = utf_code;
-					table_unicode{unicode_code} = codepage_code;
-					table_to_unicode[codepage_code] = unicode_code;
 				} else {
 					printf("Local or UTF code is out of range in %s @ %s", filepath, string);
 				}
 			}
 		}
+		table_unicode{0} = 0;
+		table_to_unicode[0] = 0;
 		fclose(f);
 	}
 }
