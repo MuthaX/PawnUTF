@@ -214,4 +214,26 @@ __PawnUTF_StringToCollation(string[], string_size, output[], output_size, is_pac
 **PawnUTF_FWrite_UTF32(File:handle, string[], is_bigendian)**
 > Writes Unicode string which encoded to UTF-32 into the file.
 > Returns number of writen symbols.
-> 
+
+# Unicode string procedures
+Here is represented string-procedures especially for Unicode strings. The reason to make it was that some native/original have complex logic based on aggregate packed strings.
+Every analogue procedure have same arguments as their original native procedures.
+
+It does not need a special analogue:
+strdel(), memcpy(), strval(), valstr(), strcmp(), strmid()
+
+It is incompatible with Unicode strings:
+strpack(), strunpack(), ispacked()
+
+**Unicode_strlen(unicode_string[])**
+> Returns length of Unicode-string.
+
+**Unicode_strcat(unicode_string_destination[], unicode_string_source[], maxlength)**
+> Concatenates Unicode source string to destination.
+
+**Unicode_strins(unicode_string_destination[], unicode_string_source[], pos, maxlength)**
+> Inserts substring into a string.
+
+**Unicode_strfind(unicode_string[], unicode_search_string[], ignorecase, pos)**
+> Find substring inside string.
+> Returns position of substring in string if found, -1 otherwise.
