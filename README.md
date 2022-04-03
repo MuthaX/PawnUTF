@@ -225,6 +225,15 @@ strdel(), memcpy(), strval(), valstr(), strcmp(), strmid()
 It is incompatible with Unicode strings:
 strpack(), strunpack(), ispacked()
 
+**Unicode_InitLowerUpper(filepath[])**
+> Load collation lower-upper Unicode-symbols.
+
+**Unicode_toupper(unicode_symbol)**
+> Returns upper version of Unicode symbol.
+
+**Unicode_tolower(unicode_symbol)**
+> Returns lower version of Unicode symbol.
+
 **Unicode_strlen(unicode_string[])**
 > Returns length of Unicode-string.
 

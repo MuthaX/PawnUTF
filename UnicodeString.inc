@@ -13,8 +13,52 @@ native bool: strins(string[], const substr[], pos, maxlength=sizeof string);
 native strcmp(const string1[], const string2[], bool:ignorecase=false, length=cellmax);
 
 TODO:
-	tolower(), toupper(), format()
+	format()
 *******************************************************************************/
+static stock UCollation_ToLower[0x10000];
+static stock UCollation_ToUpper[0x10000];
+
+//	Load collation lower-upper Unicode-symbols.
+stock Unicode_InitLowerUpper(const filepath[]) {
+	new
+		File:f = fopen(filepath, io_read),
+		string[64],
+		character_lowercase,
+		character_uppercase
+	;
+	for(new i = 0; i < 0x10000; ++i) {
+		UCollation_ToLower[i] = i;
+		UCollation_ToUpper[i] = i;
+	}
+	if( f ) {
+		while( fread(f, string) ) {
+			if( !sscanf(string, "p<\t>hh", character_lowercase, character_uppercase) ) {
+				if( character_lowercase < 0x10000 && character_uppercase < 0x10000 ) {
+					UCollation_ToLower[character_uppercase] = character_lowercase;
+					UCollation_ToUpper[character_lowercase] = character_uppercase;
+				}
+			}
+		}
+		fclose(f);
+	}
+}
+
+//	Returns upper version of Unicode symbol.
+stock Unicode_toupper(const unicode_symbol) {
+	if( 0 < unicode_symbol && unicode_symbol < 0x10000 ) {
+		return UCollation_ToUpper[unicode_symbol];
+	}
+	return unicode_symbol;
+}
+
+//	Returns lower version of Unicode symbol.
+stock Unicode_tolower(const unicode_symbol) {
+	if( 0 < unicode_symbol && unicode_symbol < 0x10000 ) {
+		return UCollation_ToLower[unicode_symbol];
+	}
+	return unicode_symbol;
+}
+
 //	Returns length of Unicode-string.
 stock Unicode_strlen(const unicode_string[]) {
 	new symbol_pos = 0;
