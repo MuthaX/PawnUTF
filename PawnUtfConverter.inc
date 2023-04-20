@@ -18,6 +18,17 @@ stock PawnUTF_IsTypeBOM_BigEndian(const e_utf_bom_mark_type:bom_type) {
 stock PawnUTF_IsTypeBOM_LittleEndian(const e_utf_bom_mark_type:bom_type) {
 	return (bom_type == e_utf_bom_mark_type:E_MARK_UTF16LE || bom_type == e_utf_bom_mark_type:E_MARK_UTF32LE);
 }
+//	Returns true if UTF-8 code symbol is valid.
+stock PawnUTF_IsValidCodeUTF8(const utf_code) {
+	if( utf_code < 0x00000080 ) {	// 1 byte.
+		return true;
+	}
+	return (
+		(0x0000C080 == (utf_code & 0xFFFFE0C0)) ||	// 2 bytes.
+		(0x00E08080 == (utf_code & 0xFFF0C0C0)) ||	// 3 bytes.
+		(0xF0808080 == (utf_code & 0xF8C0C0C0))		// 4 bytes.
+	);
+}
 //	Trying to read UTF BOM-symbol from start of the file.
 //	Places file pointer right after BOM-symbol or to the start of file if no known BOM-sequence found.
 //	Returns BOM-mark type.
