@@ -20,10 +20,8 @@ stock PawnUTF_IsTypeBOM_LittleEndian(const e_utf_bom_mark_type:bom_type) {
 }
 //	Returns true if UTF-8 code symbol is valid.
 stock PawnUTF_IsValidCodeUTF8(const utf_code) {
-	if( utf_code < 0x00000080 ) {	// 1 byte.
-		return true;
-	}
 	return (
+		(0x00000000 == (utf_code & 0xFFFFFF80)) ||	// 1 bytes (since there is no unsigned values the (utf_code < 128) is incorrect in case of 4B code).
 		(0x0000C080 == (utf_code & 0xFFFFE0C0)) ||	// 2 bytes.
 		(0x00E08080 == (utf_code & 0xFFF0C0C0)) ||	// 3 bytes.
 		(0xF0808080 == (utf_code & 0xF8C0C0C0))		// 4 bytes.
