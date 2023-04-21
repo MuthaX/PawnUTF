@@ -6,6 +6,9 @@ enum e_utf_bom_mark_type {
 	E_MARK_UTF32BE,		// UTF-32 Big Endian
 	E_MARK_UTF32LE		// UTF-32 Little Endian
 };
+static stock invalidSymbol_utfcode = '?';
+static stock invalidSymbol_unicode = '?';
+
 //	Returns True if Unicode-symbol is BOM.
 stock PawnUTF_IsUnicodeBOM(const unicode_code) {
 	return (unicode_code == 0xFEFF);
@@ -95,15 +98,14 @@ stock PawnUTF_StringToCollationB(const string[], const string_size, output[], co
 	}
 }
 //	Extract UTF-string characters from string-stream.
-stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
+stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed, const bool:allow_invalid = true) {
 	new
 		max_bytes = ((1 + is_packed * 3) * array_size),
 		output_index = 0,
 		current_byte,
 		accamulated_size = 0,
 		accamulated_value = 0,
-		current_value,
-		was_cont
+		current_value
 	;
 	for(current_byte = 0; current_byte < max_bytes; ++current_byte) {
 		if( output_index >= output_size ) {
@@ -117,33 +119,67 @@ stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const outpu
 		}
 		if( current_value & 0x80 ) {	// Ending or continuous char byte.
 			if( current_value & 0x40 ) {	// Ending char.
-				if( was_cont ) {
-					output[output_index++] = accamulated_value;
-					accamulated_value = 0;
+				if( accamulated_value ) {
+					if( output_index < output_size ) {
+						if( PawnUTF_IsValidCodeUTF8(accamulated_value) ) {
+							output[output_index++] = accamulated_value;
+						} else if( allow_invalid ) {
+							output[output_index++] = invalidSymbol_utfcode;
+						}
+					}
+					accamulated_size = accamulated_value = 0;
 				}
-				for(new i = 5; i > 0; --i) {
+
+				for(new i = 5; i > 2; --i) {
 					if( !((current_value >> i) & 1) ) {	// The first zero bit found.
 						accamulated_size = 7 - i;
 						break;
 					}
 				}
-				was_cont = 0;
+				if( accamulated_size > 4 ) {	// invalid size. UTF-8 cant have code with 5-6 bytes length.
+					if( output_index < output_size && allow_invalid ) {
+						output[output_index++] = invalidSymbol_utfcode;
+						accamulated_size = accamulated_value = 0;
+						continue;
+					}
+				}
 			} else {	// Continuous byte.
-				was_cont = 1;
+				if( !accamulated_value ) {	// no start bytes found before
+					if( output_index < output_size && allow_invalid ) {
+						output[output_index++] = invalidSymbol_utfcode;
+						accamulated_size = accamulated_value = 0;
+						continue;
+					}
+				}
 			}
 			accamulated_value |= current_value << (8 * --accamulated_size);
-		} else {	// Single byte (char).
-			if( was_cont ) {
-				output[output_index++] = accamulated_value;
-				accamulated_value = 0;
+			if( accamulated_size == 0 ) {
+				if( output_index < output_size ) {
+					output[output_index++] = accamulated_value;
+					accamulated_value = 0;
+				}
 			}
-			output[output_index++] = current_value;
+		} else {	// Single byte (char).
+			if( accamulated_value ) {
+				if( output_index < output_size ) {
+					if( PawnUTF_IsValidCodeUTF8(accamulated_value) ) {
+						output[output_index++] = accamulated_value;
+					} else if( allow_invalid ) {
+						output[output_index++] = invalidSymbol_utfcode;
+					}
+				}
+				accamulated_size = accamulated_value = 0;
+			}
 			if( !current_value ) {
+				output[output_index] = 0;
 				break;
 			}
-			was_cont = 0;
+			if( output_index < output_size ) {
+				output[output_index++] = current_value;
+			}
 		}
 	}
+	output[output_size - 1] = 0;	// Enforce string to end.
 }
 //==============================================================================
 //	Decode UTF-character to Unicode symbol.
