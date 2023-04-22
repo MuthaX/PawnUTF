@@ -184,19 +184,15 @@ stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const outpu
 //==============================================================================
 //	Decode UTF-character to Unicode symbol.
 stock PawnUTF_DecodeUTF_ToUnicode(const utf_code) {
-	new result = 0, i = 0, byte_value;
+	new result, clean_utf;
 	if( utf_code & 0x80 ) {
-		byte_value = utf_code & 0xFF;
-		while( byte_value & 0x80 ) {
-			if( byte_value & 0x40 ) {	// is end
-				result |= ((byte_value & (0xFF >> (i + 2)) ) << (6 * i));
-			} else {	// is continiuous
-				result |= ((byte_value & 0x3F) << (6 * i));
-			}
-			i++;
-			byte_value = (utf_code >> (8 * i)) & 0xFF;
-		}
-
+		clean_utf = utf_code & (((~(utf_code & 0xF8C0C0C0)) & 0xFEFEFEFE) >> 1);
+		result =
+			((clean_utf & 0x0000003F)) |
+			((clean_utf & 0x00003F00) >> 2) |
+			((clean_utf & 0x003F0000) >> 4) |
+			((clean_utf & 0xFF000000) >> 6)
+		;
 	} else {
 		result = utf_code;
 	}
