@@ -97,6 +97,47 @@ stock PawnUTF_StringToCollationB(const string[], const string_size, output[], co
 		output[i] = collation_table{cp_character};
 	}
 }
+//	Unpack UTF-string to string-stream.
+//		If not packed destination then you better use 4x output size (than input).
+stock PawnUTF_UTFToStream(const utf_string[], const utf_string_size, output[], const output_size, const bool:is_packed) {
+	new utf_code,
+		utf_pos = 0,
+		byte_index,
+		byte_value,
+		output_index,
+		max_output = ((1 + _:(is_packed != false) * 3) * output_size)
+	;
+	if( is_packed ) {
+		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
+			for(byte_index = 3; byte_index > -1; --byte_index) {
+				byte_value = (utf_code >> (8 * byte_index)) & 0xFF;
+				if( byte_value ) {
+					output{output_index++} = byte_value;
+					if(( output_index >= max_output) ) {
+						output{max_output - 1} = 0;
+						return;
+					}
+				}
+			}
+		}
+		output[output_index] = 0;
+	} else {
+		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
+			for(byte_index = 3; byte_index > -1; --byte_index) {
+				byte_value = (utf_code >> (8 * byte_index)) & 0xFF;
+				if( byte_value ) {
+					output[output_index++] = byte_value;
+					if( output_index >= max_output ) {
+						output[max_output - 1] = 0;
+						return;
+					}
+				}
+			}
+			utf_pos++;
+		}
+		output[output_index] = 0;
+	}
+}
 //	Extract UTF-string characters from string-stream.
 stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed, const bool:allow_invalid = true) {
 	new
