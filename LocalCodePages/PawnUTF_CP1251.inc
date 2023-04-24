@@ -6,7 +6,7 @@ stock CP1251_Init(const filepath[]) {
 	UTF_LoadCharsetMapping(filepath, cp1251_from_unicode, cp1251_to_unicode);
 }
 //	Convert UTF-string to CP1251-string.
-stock CP1251_FromUTF(const utf_string[], const utf_string_size, output[], const output_size, const is_packed) {
+stock CP1251_FromUTF(const utf_string[], const utf_string_size, output[], const output_size, const bool:is_packed) {
 	PawnUTF_StringUTF_ToCodePage(utf_string, utf_string_size, output, output_size, cp1251_from_unicode, is_packed);
 }
 //	Convert Unicode-string to CP1251-string.
@@ -14,12 +14,12 @@ stock CP1251_FromUnicode(const unicode_string[], const unicode_string_size, outp
 	PawnUTF_StringToCollationB(unicode_string, unicode_string_size, output, output_size, false, cp1251_from_unicode);
 }
 //	Convert CP1251-string to UTF-string.
-stock CP1251_StringToUTF(const array[], const array_size, output[], const output_size, const is_packed) {
+stock CP1251_StringToUTF(const array[], const array_size, output[], const output_size, const bool:is_packed) {
 	CP1251_StringToUnicode(array, array_size, output, output_size, is_packed);
 	PawnUTF_StringUnicode_ToUTF(output, output_size, output, output_size);
 }
 //	Convert CP1251-string to Unicode-stream.
-stock CP1251_StringToUnicode(const array[], const array_size, output[], const output_size, const is_packed) {
+stock CP1251_StringToUnicode(const array[], const array_size, output[], const output_size, const bool:is_packed) {
 	PawnUTF_StringToCollation(array, array_size, output, output_size, is_packed, cp1251_to_unicode, sizeof(cp1251_to_unicode));
 }
 //	Returns CP1251-code from Unicode-symbol.

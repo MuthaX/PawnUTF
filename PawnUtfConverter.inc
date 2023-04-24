@@ -1,3 +1,26 @@
+//	Test general collation size (cells).
+#if defined UNICODE_GENCOLLATION_SIZE
+	#if (UNICODE_GENCOLLATION_SIZE - 0) == 0
+		#error You forgot to set value of UNICODE_GENCOLLATION_SIZE. Type something like: #define UNICODE_GENCOLLATION_SIZE (64).
+	#endif
+	#if (UNICODE_GENCOLLATION_SIZE < 1)
+		#error You are trying to allocate invalid number of unicode general collation table size. Set value of UNICODE_GENCOLLATION_SIZE greather than 0.
+	#endif
+#else
+	#define UNICODE_GENCOLLATION_SIZE	(64)
+#endif
+//	Test max substitution size (bytes).
+#if defined UNICODE_GENCOLLATION_ANALOGSIZE
+	#if (UNICODE_GENCOLLATION_ANALOGSIZE - 0) == 0
+		#error You forgot to set value of UNICODE_GENCOLLATION_ANALOGSIZE. Type something like: #define UNICODE_GENCOLLATION_ANALOGSIZE (5).
+	#endif
+	#if (UNICODE_GENCOLLATION_ANALOGSIZE < 1)
+		#error You are trying to allocate invalid analog size. Set value of UNICODE_GENCOLLATION_ANALOGSIZE greather than 0.
+	#endif
+#else
+	#define UNICODE_GENCOLLATION_ANALOGSIZE	(5)
+#endif
+
 enum e_utf_bom_mark_type {
 	E_MARK_UNDEFINED,	// No BOM or unknown sequence detected.
 	E_MARK_UTF8,		// UTF-8
@@ -8,6 +31,112 @@ enum e_utf_bom_mark_type {
 };
 static stock invalidSymbol_utfcode = '?';
 static stock invalidSymbol_unicode = '?';
+static stock gencollation_unicode_min = cellmax;	// non include r.
+static stock gencollation_unicode_max = 0;			// non include.
+static stock gencollation_unicode_number = 0;
+static stock gencollation_unicode_symbol[UNICODE_GENCOLLATION_SIZE]; // Unicode code.
+static stock gencollation_unicode_length[UNICODE_GENCOLLATION_SIZE];
+static stock gencollation_unicode_string[UNICODE_GENCOLLATION_SIZE][UNICODE_GENCOLLATION_ANALOGSIZE];
+
+static stock internal_string_get_symbol(const array[], const pos, const bool:is_byte) {
+	if( is_byte ) {
+		return array{pos};
+	} else {
+		return array[pos];
+	}
+}
+static stock internal_string_get_size(const bool:is_packed, const string_size) {
+	return (1 + 3 * _:(is_packed != false)) * string_size;
+}
+static stock internal_string_lastPos(const pos) {
+	return (pos + (cellbits / charbits) - 1) / (cellbits / charbits);
+}
+
+static stock gencollation_findFree() {
+	if( gencollation_unicode_number < UNICODE_GENCOLLATION_SIZE ) {
+		for(new slotid = 0; slotid < UNICODE_GENCOLLATION_SIZE; ++slotid) {
+			if( !gencollation_unicode_symbol[slotid] ) {
+				return slotid;
+			}
+		}
+	}
+	return -1;
+}
+stock gencollation_findSymbol(const unicode_code) {
+	if(	unicode_code < gencollation_unicode_max &&
+		unicode_code > gencollation_unicode_min
+	) {
+		for(new slotid = 0, number = gencollation_unicode_number; slotid < number; ++slotid) {
+			if( gencollation_unicode_symbol[slotid] == unicode_code ) {
+				return slotid;
+			}
+		}
+	}
+	return -1;
+}
+stock PawnUTF_gencollation_addSymbol(const unicode_code, const substitutuion[]) {
+	new slotid = gencollation_findFree(),
+		length = strlen(substitutuion),
+		idx
+	;
+	if( slotid != -1 ) {
+		gencollation_unicode_symbol[slotid] = unicode_code;
+		gencollation_unicode_length[slotid] = length;
+		gencollation_unicode_number++;
+		if( gencollation_unicode_min >= unicode_code ) {
+			gencollation_unicode_min = unicode_code - 1;
+		}
+		if( gencollation_unicode_max <= unicode_code ) {
+			gencollation_unicode_max = unicode_code + 1;
+		}
+		if( length > UNICODE_GENCOLLATION_ANALOGSIZE ) {
+			length = UNICODE_GENCOLLATION_ANALOGSIZE;
+		}
+		for(idx = 0; idx < length; ++idx) {
+			gencollation_unicode_string[slotid][idx] = substitutuion[idx];
+		}
+	}
+}
+//	Loaded file have to be UTF8 encoded.
+stock PawnUTF_GenCollation_loadFile(const filepath[]) {
+	new File:f = fopen(filepath, io_read),
+		string[1 + 1 + UNICODE_GENCOLLATION_ANALOGSIZE + 1 + 1 + 32],
+		i, value, string_len,
+		unicode_code, unicode_sequence[UNICODE_GENCOLLATION_ANALOGSIZE],
+		alter_slotid
+	;
+	if( f ) {
+		while( (string_len = fread(f, string)) ) {
+			// Since sscanf2 cant parse UTF/Unicode strings normally we have to do this **** by ourself.
+			if( string[1] == '\t' && (string_len > 3) ) {
+				i = 0;
+				do {
+					value = string[i];
+					if( value == '\r' || value == '\n' ) {
+						string[i] = 0;
+						break;
+					}
+				} while(value && (i++ < sizeof(string)) );
+				unicode_code = string[0];
+				alter_slotid = gencollation_findSymbol(unicode_code);
+				if( alter_slotid == -1 ) {
+					alter_slotid = gencollation_findFree();
+					if( alter_slotid != -1 ) {
+						for(i = 0; i < UNICODE_GENCOLLATION_ANALOGSIZE; ++i) {
+							unicode_sequence[i] = string[i + 2];
+						}
+						PawnUTF_gencollation_addSymbol(unicode_code, unicode_sequence);
+					} else {
+						printf("[PawnUTF_GenCollation_loadFile] Too many general collations loaded already(reading unicode_code=%x)!", unicode_code);
+					}
+				} else {
+					printf("[PawnUTF_GenCollation_loadFile] Unicode symbol=%x already loaded!", unicode_code);
+				}
+			}
+		}
+		fclose(f);
+	}
+}
 
 //	Returns True if Unicode-symbol is BOM.
 stock PawnUTF_IsUnicodeBOM(const unicode_code) {
@@ -63,39 +192,46 @@ stock e_utf_bom_mark_type:PawnUTF_TryGetBOM(const File:handle) {
 	return e_utf_bom_mark_type:E_MARK_UNDEFINED;
 }
 //	Convert codepage-string to other representation via collation table.
-stock PawnUTF_StringToCollation(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[], const collation_size) {
+stock PawnUTF_StringToCollation(const string[], const string_size, output[], const output_size, const bool:is_packed, const collation_table[], const collation_size) {
 	new
 		cp_character,
-		i,
-		max_i = (string_size > output_size) ? output_size : string_size
+		source_index = 0, output_index = 0,
+		max_i = internal_string_get_size(is_packed, string_size)
 	;
-	for(i = 0; i < max_i; ++i) {
-
-		if( is_packed ) {
-			cp_character = string{i};
-		} else {
-			cp_character = string[i];
-		}
+	do {
+		cp_character = internal_string_get_symbol(string, source_index++, is_packed);
 		if( cp_character < collation_size ) {
-			output[i] = collation_table[cp_character];
+			output[output_index++] = collation_table[cp_character];
 		}
-	}
+	} while( cp_character && (source_index < max_i) && (output_index < output_size) );
+	output[output_size - 1] = 0;
 }
 //	Convert codepage-string to other representation via collation table with 1-byte cell.
-stock PawnUTF_StringToCollationB(const string[], const string_size, output[], const output_size, const is_packed, const collation_table[]) {
+stock PawnUTF_StringToCollationB(const string[], const string_size, output[], const output_size, const bool:is_packed, const collation_table[]) {
 	new
 		cp_character,
-		i,
-		max_i = (string_size > output_size) ? output_size : string_size
+		alter_slotid, alter_len, alter_idx,
+		source_index = 0, output_index = 0,
+		max_i = internal_string_get_size(is_packed, string_size)
 	;
-	for(i = 0; i < max_i; ++i) {
-		if( is_packed ) {
-			cp_character = string{i};
+	do {
+		cp_character = internal_string_get_symbol(string, source_index++, is_packed);
+		if( cp_character < 0x10000 ) {
+			output[output_index++] = collation_table{cp_character};
 		} else {
-			cp_character = string[i];
+			if( (alter_slotid = gencollation_findSymbol(cp_character)) != -1 ) {
+				alter_len = gencollation_unicode_length[alter_slotid];
+				for(alter_idx = 0; alter_idx < alter_len; ++alter_idx) {
+					if( output_index < output_size ) {
+						output[output_index++] = collation_table{ gencollation_unicode_string[alter_slotid][alter_idx] };
+					} else {
+						break;
+					}
+				}
+			}
 		}
-		output[i] = collation_table{cp_character};
-	}
+	} while( cp_character && (source_index < max_i) && (output_index < output_size) );
+	output[output_size - 1] = 0;
 }
 //	Unpack UTF-string to string-stream.
 //		If not packed destination then you better use 4x output size (than input).
@@ -105,7 +241,8 @@ stock PawnUTF_UTFToStream(const utf_string[], const utf_string_size, output[], c
 		byte_index,
 		byte_value,
 		output_index,
-		max_output = ((1 + _:(is_packed != false) * 3) * output_size)
+		last_pos,
+		max_output = internal_string_get_size(is_packed, output_size)
 	;
 	if( is_packed ) {
 		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
@@ -115,12 +252,20 @@ stock PawnUTF_UTFToStream(const utf_string[], const utf_string_size, output[], c
 					output{output_index++} = byte_value;
 					if(( output_index >= max_output) ) {
 						output{max_output - 1} = 0;
+						last_pos = internal_string_lastPos(output_index);
+						if( last_pos < output_size ) {
+							output[last_pos] = 0;
+						}
 						return;
 					}
 				}
 			}
 		}
-		output[output_index] = 0;
+		output{output_index} = 0;
+		last_pos = internal_string_lastPos(output_index);
+		if( last_pos < output_size ) {
+			output[last_pos] = 0;
+		}
 	} else {
 		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
 			for(byte_index = 3; byte_index > -1; --byte_index) {
@@ -137,11 +282,12 @@ stock PawnUTF_UTFToStream(const utf_string[], const utf_string_size, output[], c
 		}
 		output[output_index] = 0;
 	}
+	output[output_size - 1] = 0;
 }
 //	Extract UTF-string characters from string-stream.
-stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const is_packed, const bool:allow_invalid = true) {
+stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const bool:is_packed, const bool:allow_invalid = true) {
 	new
-		max_bytes = ((1 + is_packed * 3) * array_size),
+		max_bytes = internal_string_get_size(is_packed, array_size),
 		output_index = 0,
 		current_byte,
 		accamulated_size = 0,
@@ -153,11 +299,7 @@ stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const outpu
 			output[output_size - 1] = 0;	// Enforce string to end.
 			break;
 		}
-		if( is_packed ) {
-			current_value = array{current_byte};
-		} else {
-			current_value = array[current_byte];
-		}
+		current_value = internal_string_get_symbol(array, current_byte, is_packed);
 		if( current_value & 0x80 ) {	// Ending or continuous char byte.
 			if( current_value & 0x40 ) {	// Ending char.
 				if( accamulated_value ) {
@@ -262,41 +404,59 @@ stock PawnUTF_EncodeUnicode_ToUTF(const unicode_code) {
 stock PawnUTF_StringUTF_ToCodePage(
 	const utf_string[], const utf_string_size,
 	output[], const output_size,
-	const table_from_unicode[0x10000 char], const is_packed
+	const table_from_unicode[0x10000 char], const bool:is_packed
 ) {
 	new
-		i, j = 0,
+		source_index = 0, output_index = 0,
 		byte_value,
 		unicode_code,
-		utf_code
+		utf_code,
+		alter_slotid, alter_len, alter_idx,
+		max_output = internal_string_get_size(is_packed, output_size)
 	;
-	for(i = 0, j = 0; i < utf_string_size; ++i) {
-		if( j >= output_size ) {
-			output[output_size - 1] = 0;
-			break;
-		}
-		utf_code = utf_string[i];
+	do {
+		utf_code = utf_string[source_index++];
 		unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_code);
 		if( unicode_code < 0x10000 ) {
 			byte_value = table_from_unicode{unicode_code};
 			if( is_packed ) {
-				output{j} = byte_value;
+				output{output_index++} = byte_value;
 			} else {
-				output[j] = byte_value;
+				output[output_index++] = byte_value;
 			}
-			j++;
+		} else {
+			if( (alter_slotid = gencollation_findSymbol(unicode_code)) != -1 ) {
+				alter_len = gencollation_unicode_length[alter_slotid];
+				for(alter_idx = 0; alter_idx < alter_len; ++alter_idx) {
+					if( output_index < max_output ) {
+						byte_value = table_from_unicode{ gencollation_unicode_string[alter_slotid][alter_idx] };
+						if( byte_value ) {
+							if( is_packed ) {
+								output{output_index++} = byte_value;
+							} else {
+								output[output_index++] = byte_value;
+							}
+						}
+					} else {
+						break;
+					}
+				}
+			}
 		}
-	}
+	} while( unicode_code && (source_index < utf_string_size) && (output_index < max_output) );
+	output[output_size - 1] = 0;
 }
 //	Convert UTF-string to Unicode-string.
 stock PawnUTF_StringUTF_ToUnicode(
 	const utf_string[], const utf_string_size,
 	output[], const output_size
 ) {
-	new max_i = (utf_string_size > output_size) ? output_size : utf_string_size;
-	for(new i = 0; i < max_i; ++i) {
-		output[i] = PawnUTF_DecodeUTF_ToUnicode(utf_string[i]);
-	}
+	new max_i = (utf_string_size > output_size) ? output_size : utf_string_size,
+		i = 0, unicode_code
+	;
+	do {
+		output[i] = unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_string[i++]);
+	} while( unicode_code && (i < max_i) );
 	output[max_i - 1] = EOS;
 }
 //	Convert Unicode-string to UTF-string.
@@ -304,10 +464,12 @@ stock PawnUTF_StringUnicode_ToUTF(
 	const unicode_string[], const unicode_string_size,
 	output[], const output_size
 ) {
-	new max_i = (unicode_string_size > output_size) ? output_size : unicode_string_size;
-	for(new i = 0; i < max_i; ++i) {
-		output[i] = PawnUTF_EncodeUnicode_ToUTF(unicode_string[i]);
-	}
+	new max_i = (unicode_string_size > output_size) ? output_size : unicode_string_size,
+		i = 0, utf_code
+	;
+	do {
+		output[i] = utf_code = PawnUTF_EncodeUnicode_ToUTF(unicode_string[i++]);
+	} while( utf_code && (i < max_i) );
 	output[max_i - 1] = EOS;
 }
 //	Writes current CP-UTF collation (which used in fwrite).
