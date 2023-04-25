@@ -2,9 +2,9 @@
 UTF to codepages and vise verse convertion stuff for Pawn. Supports only BMP (Basic Multilingual Plane).  
 
 ## Glossary
-__N-String__ - arrays of symbols of type N with variable lenght in bytes (1 symbol - 1 cell) which can not be packed.
-__N-Stream__ - arrays of symbols of type N with fixed lenght in bytes which also can be packed.
-__CP-N__ - Code Page N.
+__N-String__ - arrays of symbols of type N with variable lenght in bytes (1 symbol - 1 cell) which can not be packed.  
+__N-Stream__ - arrays of symbols of type N with fixed lenght in bytes which also can be packed.  
+__CP-N__ - Code Page N.  
 
 ## General procedures
 __PawnUTF_gencollation_addSymbol(unicode_code, substitutuion[])__
