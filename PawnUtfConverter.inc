@@ -45,11 +45,35 @@ static stock internal_string_get_symbol(const array[], const pos, const bool:is_
 		return array[pos];
 	}
 }
+static stock internal_string_set_symbol(string[], const pos, const bool:is_byte, const value) {
+	if( is_byte ) {
+		string{pos} = value;
+	} else {
+		string[pos] = value;
+	}
+}
 static stock internal_string_get_size(const bool:is_packed, const string_size) {
 	return (1 + 3 * _:(is_packed != false)) * string_size;
 }
 static stock internal_string_lastPos(const pos) {
 	return (pos + (cellbits / charbits) - 1) / (cellbits / charbits);
+}
+static stock internal_putCollationItem(output[], &output_index, const output_size, const collation_item[UNICODE_GENCOLLATION_ANALOGSIZE], const collation_item_size, const collation_table[], const bool:is_packed) {
+	new alter_idx;
+	for(alter_idx = 0; alter_idx < collation_item_size; ++alter_idx) {
+		if( output_index < output_size ) {
+			internal_string_set_symbol(output, output_index++, is_packed, collation_table{ collation_item[alter_idx] });
+		} else {
+			break;
+		}
+	}
+}
+static stock internal_tryPutGenCollationSeq(output[], &output_index, const output_size, const unicode_code, const bool:is_packed, const collation_table[]) {
+	new alter_slotid, alter_len;
+	if( (alter_slotid = gencollation_findSymbol(unicode_code)) != -1 ) {
+		alter_len = gencollation_unicode_length[alter_slotid];
+		internal_putCollationItem(output, output_index, output_size, gencollation_unicode_string[alter_slotid], alter_len, collation_table, is_packed);
+	}
 }
 
 static stock gencollation_findFree() {
@@ -213,25 +237,21 @@ stock PawnUTF_StringToCollation(const string[], const string_size, output[], con
 stock PawnUTF_StringToCollationB(const string[], const string_size, output[], const output_size, const bool:is_packed, const collation_table[]) {
 	new
 		cp_character,
-		alter_slotid, alter_len, alter_idx,
+		collation_symbol,
 		source_index = 0, output_index = 0,
 		max_i = internal_string_get_size(is_packed, string_size)
 	;
 	do {
 		cp_character = internal_string_get_symbol(string, source_index++, is_packed);
 		if( cp_character < 0x10000 ) {
-			output[output_index++] = collation_table{cp_character};
-		} else {
-			if( (alter_slotid = gencollation_findSymbol(cp_character)) != -1 ) {
-				alter_len = gencollation_unicode_length[alter_slotid];
-				for(alter_idx = 0; alter_idx < alter_len; ++alter_idx) {
-					if( output_index < output_size ) {
-						output[output_index++] = collation_table{ gencollation_unicode_string[alter_slotid][alter_idx] };
-					} else {
-						break;
-					}
-				}
+			collation_symbol = collation_table{cp_character};
+			if( collation_symbol ) {
+				output[output_index++] = collation_symbol;
+			} else {
+				internal_tryPutGenCollationSeq(output, output_index, output_size, cp_character, false, collation_table);
 			}
+		} else {
+			internal_tryPutGenCollationSeq(output, output_index, output_size, cp_character, false, collation_table);
 		}
 	} while( cp_character && (source_index < max_i) && (output_index < output_size) );
 	output[output_size - 1] = 0;
@@ -414,7 +434,6 @@ stock PawnUTF_StringUTF_ToCodePage(
 		byte_value,
 		unicode_code,
 		utf_code,
-		alter_slotid, alter_len, alter_idx,
 		max_output = internal_string_get_size(is_packed, output_size)
 	;
 	do {
@@ -422,29 +441,13 @@ stock PawnUTF_StringUTF_ToCodePage(
 		unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_code);
 		if( unicode_code < 0x10000 ) {
 			byte_value = table_from_unicode{unicode_code};
-			if( is_packed ) {
-				output{output_index++} = byte_value;
+			if( byte_value ) {
+				internal_string_set_symbol(output, output_index++, is_packed, byte_value);
 			} else {
-				output[output_index++] = byte_value;
+				internal_tryPutGenCollationSeq(output, output_index, max_output, unicode_code, is_packed, table_from_unicode);
 			}
 		} else {
-			if( (alter_slotid = gencollation_findSymbol(unicode_code)) != -1 ) {
-				alter_len = gencollation_unicode_length[alter_slotid];
-				for(alter_idx = 0; alter_idx < alter_len; ++alter_idx) {
-					if( output_index < max_output ) {
-						byte_value = table_from_unicode{ gencollation_unicode_string[alter_slotid][alter_idx] };
-						if( byte_value ) {
-							if( is_packed ) {
-								output{output_index++} = byte_value;
-							} else {
-								output[output_index++] = byte_value;
-							}
-						}
-					} else {
-						break;
-					}
-				}
-			}
+			internal_tryPutGenCollationSeq(output, output_index, max_output, unicode_code, is_packed, table_from_unicode);
 		}
 	} while( unicode_code && (source_index < utf_string_size) && (output_index < max_output) );
 	output[output_size - 1] = 0;
