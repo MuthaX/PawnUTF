@@ -76,9 +76,15 @@ stock gencollation_findSymbol(const unicode_code) {
 }
 stock PawnUTF_gencollation_addSymbol(const unicode_code, const substitutuion[]) {
 	new slotid = gencollation_findFree(),
-		length = strlen(substitutuion),
+		length = 0,
 		idx
 	;
+	while((length < UNICODE_GENCOLLATION_ANALOGSIZE) && substitutuion[length]) {
+		length++;
+	}
+	if( length > UNICODE_GENCOLLATION_ANALOGSIZE ) {
+		length = UNICODE_GENCOLLATION_ANALOGSIZE;
+	}
 	if( slotid != -1 ) {
 		gencollation_unicode_symbol[slotid] = unicode_code;
 		gencollation_unicode_length[slotid] = length;
@@ -88,9 +94,6 @@ stock PawnUTF_gencollation_addSymbol(const unicode_code, const substitutuion[]) 
 		}
 		if( gencollation_unicode_max <= unicode_code ) {
 			gencollation_unicode_max = unicode_code + 1;
-		}
-		if( length > UNICODE_GENCOLLATION_ANALOGSIZE ) {
-			length = UNICODE_GENCOLLATION_ANALOGSIZE;
 		}
 		for(idx = 0; idx < length; ++idx) {
 			gencollation_unicode_string[slotid][idx] = substitutuion[idx];
