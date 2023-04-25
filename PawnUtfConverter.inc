@@ -165,6 +165,15 @@ stock PawnUTF_GenCollation_loadFile(const filepath[]) {
 	}
 }
 
+//	Returns true if UTF-8 code symbol is valid.
+stock PawnUTF_IsValidCodeUTF8(const utf_code) {
+	return (
+		(0x00000000 == (utf_code & 0xFFFFFF80)) ||	// 1 bytes (since there is no unsigned values the (utf_code < 128) is incorrect in case of 4B code).
+		(0x0000C080 == (utf_code & 0xFFFFE0C0)) ||	// 2 bytes.
+		(0x00E08080 == (utf_code & 0xFFF0C0C0)) ||	// 3 bytes.
+		(0xF0808080 == (utf_code & 0xF8C0C0C0))		// 4 bytes.
+	);
+}
 //	Returns True if Unicode-symbol is BOM.
 stock PawnUTF_IsUnicodeBOM(const unicode_code) {
 	return (unicode_code == 0xFEFF);
@@ -176,15 +185,6 @@ stock PawnUTF_IsTypeBOM_BigEndian(const e_utf_bom_mark_type:bom_type) {
 //	Returns True if UTF BOM type is little-endian.
 stock PawnUTF_IsTypeBOM_LittleEndian(const e_utf_bom_mark_type:bom_type) {
 	return (bom_type == e_utf_bom_mark_type:E_MARK_UTF16LE || bom_type == e_utf_bom_mark_type:E_MARK_UTF32LE);
-}
-//	Returns true if UTF-8 code symbol is valid.
-stock PawnUTF_IsValidCodeUTF8(const utf_code) {
-	return (
-		(0x00000000 == (utf_code & 0xFFFFFF80)) ||	// 1 bytes (since there is no unsigned values the (utf_code < 128) is incorrect in case of 4B code).
-		(0x0000C080 == (utf_code & 0xFFFFE0C0)) ||	// 2 bytes.
-		(0x00E08080 == (utf_code & 0xFFF0C0C0)) ||	// 3 bytes.
-		(0xF0808080 == (utf_code & 0xF8C0C0C0))		// 4 bytes.
-	);
 }
 //	Trying to read UTF BOM-symbol from start of the file.
 //	Places file pointer right after BOM-symbol or to the start of file if no known BOM-sequence found.
