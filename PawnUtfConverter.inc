@@ -245,7 +245,7 @@ stock PawnUTF_StringToCollationB(const string[], const string_size, output[], co
 		cp_character = internal_string_get_symbol(string, source_index++, is_packed);
 		if( cp_character < 0x10000 ) {
 			collation_symbol = collation_table{cp_character};
-			if( collation_symbol ) {
+			if( collation_symbol || (collation_symbol < 128) ) {
 				output[output_index++] = collation_symbol;
 			} else {
 				internal_tryPutGenCollationSeq(output, output_index, output_size, cp_character, false, collation_table);
@@ -441,7 +441,7 @@ stock PawnUTF_StringUTF_ToCodePage(
 		unicode_code = PawnUTF_DecodeUTF_ToUnicode(utf_code);
 		if( unicode_code < 0x10000 ) {
 			byte_value = table_from_unicode{unicode_code};
-			if( byte_value ) {
+			if( byte_value || (unicode_code < 128) ) {
 				internal_string_set_symbol(output, output_index++, is_packed, byte_value);
 			} else {
 				internal_tryPutGenCollationSeq(output, output_index, max_output, unicode_code, is_packed, table_from_unicode);
@@ -450,6 +450,13 @@ stock PawnUTF_StringUTF_ToCodePage(
 			internal_tryPutGenCollationSeq(output, output_index, max_output, unicode_code, is_packed, table_from_unicode);
 		}
 	} while( unicode_code && (source_index < utf_string_size) && (output_index < max_output) );
+	if( output_index < max_output ) {
+		if( is_packed ) {
+			output[internal_string_lastPos(output_index)] = 0;
+		} else {
+			output[output_index] = 0;
+		}
+	}
 	output[output_size - 1] = 0;
 }
 //	Convert UTF-string to Unicode-string.
