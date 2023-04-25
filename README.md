@@ -7,6 +7,17 @@ __N-Stream__ - arrays of symbols of type N with fixed lenght in bytes which also
 __CP-N__ - Code Page N.
 
 ## General procedures
+__PawnUTF_gencollation_addSymbol(unicode_code, substitutuion[])__
+> Add unicode symbol to general collation table.
+> * unicode_code - unicode code to substitute with substitution.
+> * substitutuion - the string of unicode symbols.
+
+__PawnUTF_GenCollation_loadFile(const filepath[])__
+> Loads general collation table from filepath.
+
+__PawnUTF_IsValidCodeUTF8(const utf_code)__
+> Returns true if utf_code is valid UTF-8 symbol.
+
 __PawnUTF_StringToCollation(string[], string_size, output[], output_size, is_packed, collation_table[], collation_size)__
 > Convert codepage-string to other representation via collation table.
 > * string[] - source string
@@ -16,6 +27,14 @@ __PawnUTF_StringToCollation(string[], string_size, output[], output_size, is_pac
 > * is_packed - flag if source string is packed.
 > * collation_table[] - collation table where index - is source character and value in cell - collated symbol.
 > * collation_size - size of collation_table.
+
+**PawnUTF_UTFToStream(utf_string[], utf_string_size, output[], output_size, is_packed)**
+> Unpacks UTF-8 string to UTF stream (in opposite to PawnUTF_StreamToUTF).
+> * utf_string[] - UTF string to pack (source).
+> * utf_string_size - size of source.
+> * output[] - destination of UTF stream.
+> * output_size - size of destination.
+> * is_packed - is destination have to be packed.
 
 **PawnUTF_StreamToUTF(array[], array_size, output[], output_size, is_packed)**
 > Extract UTF-string characters from string-stream.
