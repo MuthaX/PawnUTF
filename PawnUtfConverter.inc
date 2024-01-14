@@ -265,47 +265,58 @@ stock PawnUTF_UTFToStream(const utf_string[], const utf_string_size, output[], c
 		byte_value,
 		output_index,
 		last_pos,
-		max_output = internal_string_get_size(is_packed, output_size)
+		output_first_pos_of_cur_symbol,
+		max_output = internal_string_get_size(is_packed, output_size - 1)
 	;
+	if( output_size < 1 ) {
+		return;
+	}
 	if( is_packed ) {
+		max_output -= ((cellbits / charbits) - 1);
 		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
+			output_first_pos_of_cur_symbol = output_index;
 			for(byte_index = 3; byte_index > -1; --byte_index) {
 				byte_value = (utf_code >> (8 * byte_index)) & 0xFF;
 				if( byte_value ) {
 					output{output_index++} = byte_value;
-					if(( output_index >= max_output) ) {
-						output{max_output - 1} = 0;
-						last_pos = internal_string_lastPos(output_index);
-						if( last_pos < output_size ) {
-							output[last_pos] = 0;
+					if( output_index > max_output ) {
+						//	Clear all cells related to partial symbol.
+						while(output_first_pos_of_cur_symbol < max_output) {
+							output{output_first_pos_of_cur_symbol++} = 0;
 						}
-						return;
-					}
-				}
-			}
-		}
-		output{output_index} = 0;
-		last_pos = internal_string_lastPos(output_index);
-		if( last_pos < output_size ) {
-			output[last_pos] = 0;
-		}
-	} else {
-		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
-			for(byte_index = 3; byte_index > -1; --byte_index) {
-				byte_value = (utf_code >> (8 * byte_index)) & 0xFF;
-				if( byte_value ) {
-					output[output_index++] = byte_value;
-					if( output_index >= max_output ) {
-						output[max_output - 1] = 0;
-						return;
+						goto procedure_end;
 					}
 				}
 			}
 			utf_pos++;
 		}
-		output[output_index] = 0;
+		const cellsize = cellbits / charbits;
+		last_pos = ((output_index - 1 + cellsize) / cellsize) * cellsize;
+		while(output_index < last_pos) {
+			output{output_index++} = 0;
+		}
+	} else {
+		while( (utf_pos < utf_string_size) && (utf_code = utf_string[utf_pos]) ) {
+			output_first_pos_of_cur_symbol = output_index;
+			for(byte_index = 3; byte_index > -1; --byte_index) {
+				byte_value = (utf_code >> (8 * byte_index)) & 0xFF;
+				if( byte_value ) {
+					output[output_index++] = byte_value;
+					if( output_index > max_output ) {
+						//	Clear all cells related to partial symbol.
+						while(output_first_pos_of_cur_symbol < max_output) {
+							output[output_first_pos_of_cur_symbol++] = 0;
+						}
+						goto procedure_end;
+					}
+				}
+			}
+			utf_pos++;
+		}
 	}
-	output[output_size - 1] = 0;
+	procedure_end: {
+		output[output_size - 1] = 0;
+	}
 }
 //	Extract UTF-string characters from string-stream.
 stock PawnUTF_StreamToUTF(const array[], const array_size, output[], const output_size, const bool:is_packed, const bool:allow_invalid = true) {
